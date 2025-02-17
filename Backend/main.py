@@ -22,8 +22,9 @@ from firebase_admin import credentials, auth
 load_dotenv()
 
 # Cargar la clave privada de Firebase
+firebaseCred = os.getenv("FIREBASE_CREDENTIALS")
 if not firebase_admin._apps:
-    cred = credentials.Certificate("software-dml-testing-firebase-adminsdk-l1mvc-e56ae67f12.json")
+    cred = credentials.Certificate(firebaseCred)
     firebase_admin.initialize_app(cred)
 
 # Middleware para validar el token de Firebase
@@ -45,7 +46,7 @@ app = FastAPI()
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite todos los orígenes
+    allow_origins=[os.getenv("CORS_ALLOWED_URL")],  # Permite todos los orígenes
     allow_credentials=True,
     allow_methods=["*"],  # Permite todos los métodos
     allow_headers=["*"],  # Permite todos los headers
@@ -58,13 +59,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 db_config = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', ''),
-    'database': os.getenv('DB_NAME', 'dml')
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME')
 }
 
-pool = MySQLConnectionPool(pool_name="mypool", pool_size=5, **db_config)
+pool = MySQLConnectionPool(pool_name="mypool", pool_size=10, **db_config)
 
 class SafeString(BaseModel):
     value: str = Field(..., pattern=r"^[a-zA-Z0-9_]+$")
@@ -222,7 +223,6 @@ async def search_repuestos(request: Request, term: str, user=Depends(verify_fire
         if connection is None:
             raise HTTPException(status_code=500, detail="Database connection failed")
         cursor = connection.cursor(dictionary=True)
-        validate_input(term)
         query = """SELECT * FROM repuestos 
                    WHERE codigo LIKE %s 
                    OR descripción LIKE %s 
@@ -356,7 +356,6 @@ async def search_fichas(request: Request, term: str, user=Depends(verify_firebas
         if connection is None:
             raise HTTPException(status_code=500, detail="Database connection failed")
         cursor = connection.cursor(dictionary=True)
-        validate_input(term)
         query = """
         SELECT * FROM maquinas 
         WHERE numero_ficha LIKE %s 
@@ -428,5 +427,5 @@ async def update_stock(request: Request, ficha_id: int, repuesto_codigo: str, pa
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=os.getenv("PORT"))
 
